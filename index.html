@@ -66,6 +66,12 @@
   #aviso h2{ margin:0 0 8px; }
   #aviso p{ color:var(--muted); line-height:1.5; font-size:14px; }
   a-scene{ position:fixed; inset:0; }
+  /* força o vídeo da câmera e o canvas a preencherem a tela e ficarem no fundo */
+  #arjs-video, video, .a-canvas, canvas.a-canvas{
+    position:fixed !important; top:0 !important; left:0 !important;
+    width:100vw !important; height:100vh !important; object-fit:cover !important; }
+  #arjs-video, video{ z-index:0 !important; }
+  .a-canvas, canvas.a-canvas{ z-index:1 !important; background:transparent !important; }
 </style>
 </head>
 <body>
@@ -105,14 +111,14 @@
 
 <div id="aviso"><div class="box">
   <button class="fechar" onclick="document.getElementById('aviso').style.display='none'" title="Fechar">×</button>
-  <h2>Câmera não disponível</h2>
-  <p>Para a Realidade Aumentada é preciso permitir a câmera e abrir a página por
-  <b>HTTPS</b> (no celular) ou <b>http://localhost</b> (no PC). Enquanto isso, use o
-  <b>Modo demonstração</b> no canto inferior direito.</p>
+  <h2>Câmera não iniciou</h2>
+  <p>Permita a câmera e recarregue. No <b>iPhone</b> use o <b>Safari</b>; no <b>Android</b>, o <b>Chrome</b>
+  (não abra dentro de Instagram/WhatsApp). Se continuar preto, feche outros apps que usem a câmera.
+  Enquanto isso, use o <b>Modo demonstração</b> no canto inferior direito.</p>
 </div></div>
 
 <!-- ===================== CENA WEBAR ===================== -->
-<a-scene embedded vr-mode-ui="enabled:false" renderer="logarithmicDepthBuffer:true; precision:medium"
+<a-scene embedded vr-mode-ui="enabled:false" renderer="alpha:true; logarithmicDepthBuffer:true; precision:medium"
          arjs="sourceType:webcam; detectionMode:mono; patternRatio:0.5; debugUIEnabled:false;"
          id="scene">
 
@@ -233,7 +239,13 @@ window.addEventListener("DOMContentLoaded", ()=>{
   // aviso se a câmera falhar
   window.addEventListener("camera-error", ()=>document.getElementById("aviso").style.display="flex");
   window.addEventListener("camera-init",  ()=>document.getElementById("aviso").style.display="none");
-  setTimeout(()=>{ if(!document.querySelector("video")) document.getElementById("aviso").style.display="flex"; }, 4000);
+  // verifica se a câmera realmente está transmitindo (vídeo com dimensão), não só se o elemento existe
+  let tentativas = 0;
+  const checarCamera = setInterval(()=>{
+    const v = document.querySelector("video");
+    if (v && v.videoWidth > 0){ document.getElementById("aviso").style.display="none"; clearInterval(checarCamera); return; }
+    if (++tentativas >= 4){ document.getElementById("aviso").style.display="flex"; clearInterval(checarCamera); }
+  }, 2000);
 });
 </script>
 </body>
