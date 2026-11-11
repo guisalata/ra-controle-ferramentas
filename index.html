@@ -3,251 +3,532 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>RA • Controle de Ferramentas de Usinagem — Grupo 01</title>
-
-<!-- Bibliotecas WebAR (carregadas pelo navegador do usuário) -->
+<title>InspeAR · Assistente de Inspeção de Empilhadeiras</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
-<!-- Base de dados das ferramentas (recorte do sistema Electron) -->
-<script src="dados_ferramentas.js"></script>
-
 <style>
-  :root{ --bg:#0d1117; --panel:#161b22; --line:#2a313c; --txt:#e6edf3; --muted:#9aa7b4;
-         --ok:#30a46c; --warn:#f5a623; --crit:#e5484d; --accent:#2f81f7; }
-  *{ box-sizing:border-box; }
-  html,body{ margin:0; height:100%; font-family:"Segoe UI",Roboto,Arial,sans-serif; color:var(--txt); background:#000; overflow:hidden; }
+  :root{
+    --bg:#0d1016; --bg2:#12161e; --panel:#161b24; --panel2:#1b2230; --line:#2a323f;
+    --txt:#e7edf3; --muted:#93a1b2; --faint:#6b7889;
+    --accent:#3b82f6; --accent2:#1d4ed8;
+    --ok:#22c55e; --fail:#ef4444; --pend:#f59e0b;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:transparent;color:var(--txt);
+    font-family:"Segoe UI",system-ui,Roboto,Arial,sans-serif;overflow:hidden}
+  button{font:inherit;cursor:pointer;color:var(--txt);border:none;background:none}
+  input,textarea{font:inherit}
 
-  /* Faixa de título */
-  #topbar{ position:fixed; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; gap:10px;
-           padding:8px 14px; background:linear-gradient(180deg,rgba(13,17,23,.92),rgba(13,17,23,.55));
-           backdrop-filter:blur(3px); font-size:13px; letter-spacing:.3px; }
-  #topbar b{ font-size:14px; }
-  #topbar .tag{ margin-left:auto; color:var(--muted); font-size:11px; border:1px solid var(--line);
-                padding:3px 8px; border-radius:20px; }
+  /* fundo de reserva atrás do vídeo */
+  #bgfallback{position:fixed;inset:0;z-index:-2;background:
+    radial-gradient(1200px 600px at 50% -10%, #19202b 0%, #0d1016 60%)}
 
-  /* Painel HUD de dados */
-  #hud{ position:fixed; z-index:30; left:12px; bottom:12px; width:min(360px,calc(100% - 24px));
-        background:rgba(22,27,34,.93); border:1px solid var(--line); border-radius:14px; padding:14px 16px;
-        box-shadow:0 8px 30px rgba(0,0,0,.45); transition:transform .25s ease, opacity .25s ease; }
-  #hud.hidden{ transform:translateY(16px); opacity:0; pointer-events:none; }
-  #hud .head{ display:flex; align-items:center; gap:10px; }
-  #hud .dot{ width:14px; height:14px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 10px currentColor; }
-  #hud .cod{ font-size:12px; color:var(--muted); letter-spacing:.5px; }
-  #hud .nome{ font-size:17px; font-weight:700; line-height:1.2; }
-  #hud .status{ margin-left:auto; font-size:11px; font-weight:700; padding:4px 9px; border-radius:20px; white-space:nowrap; }
-  #hud .grid{ margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:4px 10px; font-size:12.5px; }
-  #hud .grid span:nth-child(odd){ color:var(--muted); }
-  #hud .bar{ height:8px; border-radius:6px; background:#0b0f14; border:1px solid var(--line); overflow:hidden; margin-top:3px; }
-  #hud .bar > i{ display:block; height:100%; }
-  #hud .hist{ margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
-  #hud .hist h4{ margin:0 0 5px; font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.4px; text-transform:uppercase; }
-  #hud .hist .row{ display:flex; gap:8px; font-size:12px; padding:2px 0; }
-  #hud .hist .row b{ width:72px; color:var(--muted); font-weight:500; }
-  #hud .empty{ color:var(--muted); font-size:13px; padding:4px 0; }
-
-  /* Legenda + controles */
-  #side{ position:fixed; z-index:30; right:12px; bottom:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
-  .legend{ background:rgba(22,27,34,.9); border:1px solid var(--line); border-radius:12px; padding:8px 10px; font-size:11.5px; }
-  .legend div{ display:flex; align-items:center; gap:7px; padding:1px 0; }
-  .legend i{ width:10px; height:10px; border-radius:50%; }
-  .demo{ background:rgba(22,27,34,.9); border:1px solid var(--line); border-radius:12px; padding:8px 10px; }
-  .demo p{ margin:0 0 6px; font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-  .demo button{ font:inherit; font-size:12px; color:var(--txt); background:#1f2630; border:1px solid var(--line);
-                border-radius:8px; padding:5px 9px; margin:2px; cursor:pointer; }
-  .demo button:hover{ border-color:var(--accent); }
-  .demo button.off{ background:transparent; color:var(--muted); }
-
-  /* Aviso de câmera */
-  #aviso{ position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:24px;
-          background:rgba(5,8,12,.92); text-align:center; }
-  #aviso .box{ max-width:440px; position:relative; }
-  #aviso .fechar{ position:absolute; top:-10px; right:-6px; background:#1f2630; color:#e6edf3; border:1px solid var(--line);
-                  border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer; }
-  #aviso h2{ margin:0 0 8px; }
-  #aviso p{ color:var(--muted); line-height:1.5; font-size:14px; }
-  a-scene{ position:fixed; inset:0; }
-  /* força o vídeo da câmera e o canvas a preencherem a tela e ficarem no fundo */
+  /* ===== câmera/AR: vídeo e canvas preenchendo a tela ===== */
   #arjs-video, video, .a-canvas, canvas.a-canvas{
     position:fixed !important; top:0 !important; left:0 !important;
-    width:100vw !important; height:100vh !important;
-    margin:0 !important; object-fit:cover !important; }
-  #arjs-video, video{ z-index:0 !important; display:block !important;
-    visibility:visible !important; opacity:1 !important; }
-  .a-canvas, canvas.a-canvas{ z-index:1 !important; background:transparent !important; }
+    width:100vw !important; height:100vh !important; margin:0 !important; object-fit:cover !important; }
+  #arjs-video, video{ z-index:-1 !important; display:block !important; visibility:visible !important; opacity:1 !important; }
+  .a-canvas, canvas.a-canvas{ z-index:0 !important; background:transparent !important; }
+  a-scene{position:fixed;inset:0}
+
+  /* ===== App bar ===== */
+  #appbar{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;gap:12px;
+    padding:10px 14px;background:linear-gradient(180deg,rgba(13,16,22,.96),rgba(13,16,22,.72));
+    backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+  #appbar .logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.3px}
+  #appbar .logo .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff}
+  #appbar .logo small{display:block;font-weight:500;color:var(--muted);font-size:10px;letter-spacing:.5px}
+  #appbar .equip{margin-left:auto;display:flex;gap:8px;align-items:center}
+  #appbar .equip .f{display:flex;flex-direction:column;gap:2px}
+  #appbar .equip label{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint)}
+  #appbar .equip input{width:120px;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    border-radius:8px;padding:5px 8px;font-size:12.5px}
+  #appbar .equip input:focus{outline:none;border-color:var(--accent)}
+
+  /* badge de status da câmera */
+  #camstate{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:20px;
+    padding:3px 9px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  #camstate .d{width:7px;height:7px;border-radius:50%;background:var(--pend)}
+  #camstate.ok .d{background:var(--ok)} #camstate.off .d{background:var(--fail)}
+
+  /* ===== Botão flutuante p/ abrir painel (mobile) ===== */
+  #fab{position:fixed;z-index:34;right:14px;bottom:16px;display:none;align-items:center;gap:8px;
+    background:var(--accent);color:#fff;font-weight:600;padding:12px 16px;border-radius:30px;
+    box-shadow:0 10px 24px rgba(0,0,0,.4)}
+  #fab .count{background:rgba(255,255,255,.22);border-radius:20px;padding:1px 8px;font-size:12px}
+
+  /* ===== Painel ===== */
+  #panel{position:fixed;z-index:33;background:var(--bg);border-left:1px solid var(--line);
+    display:flex;flex-direction:column}
+  @media(min-width:900px){
+    #panel{top:57px;right:0;bottom:0;width:390px}
+    #fab{display:none !important}
+  }
+  @media(max-width:899px){
+    #panel{left:0;right:0;bottom:0;height:72vh;border-left:none;border-top:1px solid var(--line);
+      border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .28s ease}
+    #panel.open{transform:translateY(0)}
+    #fab{display:flex}
+  }
+  #panel .grip{display:none}
+  @media(max-width:899px){#panel .grip{display:block;width:40px;height:4px;border-radius:3px;background:#39424f;margin:8px auto 2px}}
+
+  /* tabs */
+  .tabs{display:flex;padding:6px 10px 0;gap:4px;border-bottom:1px solid var(--line)}
+  .tabs button{flex:1;padding:10px 6px;color:var(--muted);font-size:12.5px;font-weight:600;
+    border-bottom:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:6px}
+  .tabs button.active{color:var(--txt);border-bottom-color:var(--accent)}
+  .tabs .pill{min-width:18px;height:18px;border-radius:9px;background:var(--panel2);color:var(--muted);
+    font-size:10.5px;display:grid;place-items:center;padding:0 5px}
+  .view{flex:1;overflow-y:auto;padding:12px 12px 90px}
+
+  /* ===== Componentes ===== */
+  .comp{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:11px 12px;margin-bottom:9px;cursor:pointer;transition:border-color .15s}
+  .comp:hover{border-color:#394657}
+  .comp .num{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:var(--panel2);
+    display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--muted);border:1px solid var(--line)}
+  .comp .info{flex:1;min-width:0}
+  .comp .info .t{font-size:14px;font-weight:600}
+  .comp .info .s{font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip{font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
+  .chip.pendente{background:rgba(245,158,11,.14);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
+  .chip.aprovado{background:rgba(34,197,94,.14);color:#4ade80;border:1px solid rgba(34,197,94,.35)}
+  .chip.reprovado{background:rgba(239,68,68,.14);color:#f87171;border:1px solid rgba(239,68,68,.35)}
+
+  /* detalhe do componente */
+  #detail{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:5}
+  #detail.open{display:flex}
+  .dhead{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line)}
+  .dhead .back{width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--line);
+    display:grid;place-items:center;font-size:16px}
+  .dhead .t{font-size:15px;font-weight:700}
+  .dhead .t small{display:block;font-weight:500;color:var(--faint);font-size:11px}
+  .dbody{flex:1;overflow-y:auto;padding:14px}
+  .block-title{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);margin:4px 0 10px}
+  .check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #1f2733;font-size:13.5px;color:#cfd8e3}
+  .check .b{flex:0 0 auto;width:18px;height:18px;border:1px solid var(--line);border-radius:5px;margin-top:1px;
+    display:grid;place-items:center;font-size:11px;color:var(--muted)}
+  .dactions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border-top:1px solid var(--line);background:var(--bg2)}
+  .dactions .full{grid-column:1/3}
+  .btn{padding:12px;border-radius:10px;font-weight:700;font-size:13.5px;display:flex;align-items:center;
+    justify-content:center;gap:8px;border:1px solid var(--line);background:var(--panel)}
+  .btn.ok{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:#86efac}
+  .btn.ok.active{background:var(--ok);color:#06240f;border-color:var(--ok)}
+  .btn.fail{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:#fca5a5}
+  .btn.fail.active{background:var(--fail);color:#2a0606;border-color:var(--fail)}
+  .btn.ghost{background:transparent;color:var(--muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.block{width:100%}
+
+  /* ocorrências */
+  .occ{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--fail);
+    border-radius:10px;padding:11px 12px;margin-bottom:9px}
+  .occ .top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px}
+  .occ .comp-n{font-size:12.5px;font-weight:700}
+  .occ .time{font-size:10.5px;color:var(--faint)}
+  .occ .desc{font-size:13px;color:#cfd8e3;line-height:1.4}
+  .occ .del{color:var(--faint);font-size:12px;background:none;border:none}
+  .empty{color:var(--faint);text-align:center;font-size:13px;padding:30px 14px;line-height:1.5}
+  textarea{width:100%;min-height:76px;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:10px;resize:vertical;font-size:13.5px}
+  textarea:focus{outline:none;border-color:var(--accent)}
+  select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-size:13.5px}
+  select:focus{outline:none;border-color:var(--accent)}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);display:block;margin:12px 0 6px}
+
+  /* resumo */
+  .verdict{border-radius:12px;padding:16px;text-align:center;margin-bottom:14px;border:1px solid var(--line)}
+  .verdict .lbl{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .verdict .v{font-size:22px;font-weight:800;margin-top:4px}
+  .verdict.apta{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.4)} .verdict.apta .v{color:#4ade80}
+  .verdict.nao{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4)} .verdict.nao .v{color:#f87171}
+  .verdict.inc{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4)} .verdict.inc .v{color:#fbbf24}
+  .progress{height:8px;background:#0b0f15;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:10px 0 4px}
+  .progress>span{display:block;height:100%;background:var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
+  .stat .n{font-size:22px;font-weight:800}
+  .stat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);margin-top:2px}
+  .stat.ok .n{color:#4ade80}.stat.fail .n{color:#f87171}.stat.pend .n{color:#fbbf24}
+
+  /* modal */
+  #modal{position:fixed;inset:0;z-index:50;background:rgba(5,8,12,.75);display:none;align-items:center;
+    justify-content:center;padding:18px;backdrop-filter:blur(3px)}
+  #modal.open{display:flex}
+  #modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:100%;max-width:440px;
+    max-height:84vh;display:flex;flex-direction:column;overflow:hidden}
+  #modal .mh{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid var(--line)}
+  #modal .mh b{font-size:15px}
+  #modal pre{margin:0;padding:14px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px;line-height:1.55;color:#cfd8e3;white-space:pre-wrap}
+  #modal .mf{display:flex;gap:9px;padding:12px;border-top:1px solid var(--line)}
+
+  /* aviso câmera */
+  #aviso{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:26px;
+    background:rgba(8,11,16,.82);text-align:center}
+  #aviso .box{max-width:430px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+  #aviso h3{margin:0 0 8px} #aviso p{color:var(--muted);line-height:1.55;font-size:13.5px;margin:0}
+  .toast{position:fixed;z-index:60;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:#0b1220;border:1px solid var(--line);color:var(--txt);padding:11px 16px;border-radius:10px;
+    font-size:13px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
+<div id="bgfallback"></div>
 
-<div id="topbar">
-  <b>RA · Controle de Ferramentas</b>
-  <span style="color:var(--muted)">Setor de Usinagem — Fábrica de Empilhadeiras Automáticas</span>
-  <span class="tag">Grupo 01 · WebAR (AR.js)</span>
+<!-- ===================== CENA WEBAR ===================== -->
+<a-scene embedded vr-mode-ui="enabled:false" renderer="alpha:true; logarithmicDepthBuffer:true; precision:medium"
+         arjs="sourceType:webcam; detectionMode:mono; patternRatio:0.5; debugUIEnabled:false;" id="scene">
+  <a-assets>
+    <a-mixin id="hotlabel" text="align:center; color:#ffffff; width:3.2"></a-mixin>
+  </a-assets>
+  <a-marker id="marker" type="pattern" url="emp.patt" smooth="true" smoothCount="7" smoothTolerance="0.01">
+    <a-entity id="rig"></a-entity>
+  </a-marker>
+  <a-entity camera></a-entity>
+</a-scene>
+
+<!-- ===================== APP BAR ===================== -->
+<div id="appbar">
+  <div class="logo">
+    <div class="mark">IA</div>
+    <div>InspeAR<small>Inspeção de empilhadeiras · RA</small></div>
+  </div>
+  <div id="camstate"><span class="d"></span><span class="t">iniciando câmera…</span></div>
+  <div class="equip">
+    <div class="f"><label>Equipamento</label><input id="eq-id" placeholder="EMP-000" maxlength="14"></div>
+    <div class="f"><label>Operador</label><input id="eq-op" placeholder="Nome" maxlength="24"></div>
+  </div>
 </div>
 
-<!-- Painel de dados (preenchido via JS) -->
-<div id="hud" class="hidden">
-  <div class="head">
-    <span class="dot" id="h-dot"></span>
-    <div>
-      <div class="cod" id="h-cod">—</div>
-      <div class="nome" id="h-nome">—</div>
+<!-- ===================== PAINEL ===================== -->
+<div id="panel">
+  <div class="grip"></div>
+  <div class="tabs">
+    <button data-tab="comp" class="active"><span>Componentes</span><span class="pill" id="pill-comp">0/8</span></button>
+    <button data-tab="occ"><span>Ocorrências</span><span class="pill" id="pill-occ">0</span></button>
+    <button data-tab="res"><span>Resumo</span></button>
+  </div>
+
+  <!-- COMPONENTES -->
+  <div class="view" id="view-comp"></div>
+
+  <!-- detalhe (sobreposto) -->
+  <div id="detail">
+    <div class="dhead">
+      <button class="back" id="d-back">‹</button>
+      <div class="t" id="d-title">—</div>
     </div>
-    <span class="status" id="h-status"></span>
+    <div class="dbody">
+      <div class="block-title">O que verificar</div>
+      <div id="d-items"></div>
+    </div>
+    <div class="dactions">
+      <button class="btn ok" id="d-ok">Aprovar</button>
+      <button class="btn fail" id="d-fail">Reprovar</button>
+      <button class="btn ghost full" id="d-occ">+ Registrar ocorrência neste componente</button>
+    </div>
   </div>
-  <div class="grid" id="h-grid"></div>
-  <div class="hist" id="h-hist"></div>
+
+  <!-- OCORRÊNCIAS -->
+  <div class="view" id="view-occ" style="display:none">
+    <button class="btn primary block" id="occ-new" style="margin-bottom:12px">+ Nova ocorrência</button>
+    <div id="occ-list"></div>
+  </div>
+
+  <!-- RESUMO -->
+  <div class="view" id="view-res" style="display:none">
+    <div class="verdict" id="verdict"><div class="lbl">Resultado da inspeção</div><div class="v">—</div></div>
+    <div class="progress"><span id="prog" style="width:0%"></span></div>
+    <div style="font-size:12px;color:var(--muted)" id="prog-txt">0 de 8 componentes inspecionados</div>
+    <div class="stats">
+      <div class="stat ok"><div class="n" id="st-ok">0</div><div class="l">Aprovados</div></div>
+      <div class="stat fail"><div class="n" id="st-fail">0</div><div class="l">Reprovados</div></div>
+      <div class="stat pend"><div class="n" id="st-pend">8</div><div class="l">Pendentes</div></div>
+    </div>
+    <button class="btn primary block" id="res-report" style="margin-bottom:9px">Gerar relatório</button>
+    <button class="btn ghost block" id="res-reset">Nova inspeção</button>
+  </div>
 </div>
 
-<div id="side">
-  <div class="legend">
-    <div><i style="background:#30a46c"></i> OK</div>
-    <div><i style="background:#f5a623"></i> Atenção (baixo / calibração)</div>
-    <div><i style="background:#e5484d"></i> Crítico (repor)</div>
-  </div>
-  <div class="demo">
-    <p>Modo demonstração (sem marcador)</p>
-    <div id="demo-btns"></div>
-    <button class="off" onclick="demo(null)">limpar</button>
+<button id="fab" onclick="openPanel()"><span>Inspeção</span><span class="count" id="fab-count">0/8</span></button>
+
+<!-- form de ocorrência (modal) -->
+<div id="modal">
+  <div class="box">
+    <div class="mh"><b id="modal-title">Relatório</b><button class="btn ghost" style="padding:6px 10px" onclick="closeModal()">✕</button></div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
 <div id="aviso"><div class="box">
-  <button class="fechar" onclick="document.getElementById('aviso').style.display='none'" title="Fechar">×</button>
-  <h2>Câmera não iniciou</h2>
-  <p>Permita a câmera e recarregue. No <b>iPhone</b> use o <b>Safari</b>; no <b>Android</b>, o <b>Chrome</b>
-  (não abra dentro de Instagram/WhatsApp). Se continuar preto, feche outros apps que usem a câmera.
-  Enquanto isso, use o <b>Modo demonstração</b> no canto inferior direito.</p>
+  <h3>Câmera não iniciou</h3>
+  <p>Permita a câmera e recarregue. No celular use <b>Chrome</b> (Android) ou <b>Safari</b> (iPhone), fora de apps como Instagram/WhatsApp. O restante da inspeção funciona mesmo sem câmera.</p>
 </div></div>
 
-<!-- ===================== CENA WEBAR ===================== -->
-<a-scene embedded vr-mode-ui="enabled:false" renderer="alpha:true; logarithmicDepthBuffer:true; precision:medium"
-         arjs="sourceType:webcam; detectionMode:mono; patternRatio:0.5; debugUIEnabled:false;"
-         id="scene">
-
-  <!-- MK1 -->
-  <a-marker id="ar-mk1" type="pattern" url="mk1.patt" smooth="true" smoothCount="6" data-tool="mk1">
-    <a-entity class="ar-content"></a-entity>
-  </a-marker>
-  <!-- MK2 -->
-  <a-marker id="ar-mk2" type="pattern" url="mk2.patt" smooth="true" smoothCount="6" data-tool="mk2">
-    <a-entity class="ar-content"></a-entity>
-  </a-marker>
-  <!-- MK3 -->
-  <a-marker id="ar-mk3" type="pattern" url="mk3.patt" smooth="true" smoothCount="6" data-tool="mk3">
-    <a-entity class="ar-content"></a-entity>
-  </a-marker>
-
-  <a-entity camera></a-entity>
-</a-scene>
+<div class="toast" id="toast"></div>
 
 <script>
-/* ---------- utilidades ---------- */
-function fmtData(d){ if(!d) return "—"; const [a,m,g]=d.split("-"); return `${g}/${m}/${a}`; }
+/* ============================ DADOS ============================ */
+const COMPONENTES = [
+  {key:'identificacao', nome:'Identificação do equipamento', pos:[0.70,0.65,0.35],
+   itens:['Placa de identificação legível','Capacidade de carga informada','Horímetro em funcionamento','Validade da próxima manutenção']},
+  {key:'pneus', nome:'Pneus / rodas', pos:[0.58,0.24,-0.72],
+   itens:['Desgaste da banda de rodagem','Cortes, bolhas ou avarias','Fixação e aperto das rodas','Objetos presos aos pneus']},
+  {key:'garfos', nome:'Garfos', pos:[0.0,0.12,-1.30],
+   itens:['Trincas ou empenamento','Desgaste do calcanhar (limite 10%)','Travas de fixação atuando','Alinhamento entre os garfos']},
+  {key:'mastro', nome:'Mastro e correntes', pos:[0.0,1.95,-0.90],
+   itens:['Tensão e lubrificação das correntes','Elos danificados ou esticados','Roletes e folgas do mastro','Elevação e inclinação suaves']},
+  {key:'hidraulico', nome:'Sistema hidráulico', pos:[0.0,0.55,-0.78],
+   itens:['Vazamentos em cilindros e conexões','Nível do fluido hidráulico','Estado e fixação das mangueiras','Resposta dos comandos']},
+  {key:'eletrico', nome:'Sistema elétrico / bateria', pos:[0.0,0.55,0.95],
+   itens:['Nível de carga da bateria','Cabos e terminais sem corrosão','Fixação da bateria','Luzes, buzina e alarme de ré']},
+  {key:'sensores', nome:'Sensores de segurança', pos:[0.0,1.05,-1.05],
+   itens:['Sensores de presença / obstáculo','Parada de emergência','Cinto de segurança','Luzes de advertência / giroflex']},
+  {key:'freios', nome:'Freios', pos:[-0.58,0.24,0.72],
+   itens:['Freio de serviço','Freio de estacionamento','Curso do pedal','Resposta ao acionamento']},
+];
+const COR = {pendente:'#f59e0b', aprovado:'#22c55e', reprovado:'#ef4444'};
+const KEY='inspear_v1';
 
-/* ---------- monta o conteúdo 3D (RA) de cada marcador ---------- */
-function montarConteudoAR(){
-  document.querySelectorAll("a-marker").forEach(mk=>{
-    const f = window.FERRAMENTAS[mk.dataset.tool]; if(!f) return;
-    const s = window.calcularStatus(f);
-    const wrap = mk.querySelector(".ar-content");
+/* ============================ ESTADO ============================ */
+let STATE = load();
+function novoEstado(){
+  const s={equip:{id:'',op:''}, comp:{}, occ:[]};
+  COMPONENTES.forEach(c=>s.comp[c.key]='pendente');
+  return s;
+}
+function load(){
+  try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.comp){ // completa chaves novas
+    COMPONENTES.forEach(c=>{if(!r.comp[c.key])r.comp[c.key]='pendente'}); return r;}}catch(e){}
+  return novoEstado();
+}
+function save(){ try{localStorage.setItem(KEY, JSON.stringify(STATE));}catch(e){} }
 
-    // painel de dados deitado sobre o marcador (lido de cima)
-    const texto =
-      `${f.codigo}\n${f.nome}\n\n`+
-      `Estoque: ${f.estoqueAtual}/${f.estoqueMinimo} ${f.unidade}\n`+
-      `Local: ${f.local}\n`+
-      `${s.rotulo}`;
+/* ============================ UI HELPERS ============================ */
+const $=s=>document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2200);}
+function statusLabel(s){return s==='pendente'?'Não inspecionado':s==='aprovado'?'Aprovado':'Reprovado';}
 
-    wrap.innerHTML =
-      `<a-entity rotation="-90 0 0" position="0 0.02 -1.15">
-         <a-plane width="3.1" height="2.2" material="shader:flat; color:#0d1117; opacity:0.92"></a-plane>
-         <a-plane width="3.1" height="0.12" position="0 1.04 0.001" material="shader:flat; color:${s.cor}"></a-plane>
-         <a-text value="${texto}" align="center" width="2.9" color="#e6edf3"
-                 position="0 0 0.01" baseline="center" wrap-count="26"></a-text>
-       </a-entity>
-       <!-- cubo de status flutuante -->
-       <a-box position="0 0.55 0" depth="0.45" height="0.45" width="0.45"
-              material="shader:flat; color:${s.cor}; opacity:0.92"
-              animation="property:position; to:0 0.8 0; dir:alternate; loop:true; dur:1200; easing:easeInOutSine">
-       </a-box>
-       <a-text value="${f.codigo}" align="center" width="4" color="#ffffff"
-               position="0 1.25 0" rotation="-20 0 0"></a-text>`;
+/* ---- aba ---- */
+function setTab(tab){
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  $('#view-comp').style.display = tab==='comp'?'block':'none';
+  $('#view-occ').style.display  = tab==='occ'?'block':'none';
+  $('#view-res').style.display  = tab==='res'?'block':'none';
+  if(tab==='occ') renderOcc();
+  if(tab==='res') renderResumo();
+}
+
+/* ---- lista de componentes ---- */
+function renderComp(){
+  const v=$('#view-comp'); v.innerHTML='';
+  COMPONENTES.forEach((c,i)=>{
+    const st=STATE.comp[c.key];
+    const el=document.createElement('div'); el.className='comp';
+    el.innerHTML=`<div class="num">${i+1}</div>
+      <div class="info"><div class="t">${c.nome}</div><div class="s">${statusLabel(st)}</div></div>
+      <span class="chip ${st}">${st==='pendente'?'PENDENTE':st==='aprovado'?'APROVADO':'REPROVADO'}</span>`;
+    el.onclick=()=>openDetail(c.key);
+    v.appendChild(el);
+  });
+  const done=COMPONENTES.filter(c=>STATE.comp[c.key]!=='pendente').length;
+  $('#pill-comp').textContent=`${done}/${COMPONENTES.length}`;
+  $('#fab-count').textContent=`${done}/${COMPONENTES.length}`;
+  $('#pill-occ').textContent=STATE.occ.length;
+}
+
+/* ---- detalhe ---- */
+let currentKey=null;
+function openDetail(key){
+  currentKey=key; const c=COMPONENTES.find(x=>x.key===key); const st=STATE.comp[key];
+  $('#d-title').innerHTML=`${c.nome}<small>${statusLabel(st)}</small>`;
+  $('#d-items').innerHTML=c.itens.map(t=>`<div class="check"><div class="b">✓</div><div>${t}</div></div>`).join('');
+  $('#d-ok').classList.toggle('active',st==='aprovado');
+  $('#d-fail').classList.toggle('active',st==='reprovado');
+  $('#detail').classList.add('open');
+}
+function closeDetail(){$('#detail').classList.remove('open');currentKey=null;}
+function setStatus(key,st){
+  STATE.comp[key]=st; save(); renderComp(); updateHotspots();
+  const c=COMPONENTES.find(x=>x.key===key);
+  $('#d-title').innerHTML=`${c.nome}<small>${statusLabel(st)}</small>`;
+  $('#d-ok').classList.toggle('active',st==='aprovado');
+  $('#d-fail').classList.toggle('active',st==='reprovado');
+  toast(`${c.nome}: ${statusLabel(st)}`);
+}
+
+/* ---- ocorrências ---- */
+function renderOcc(){
+  const v=$('#occ-list');
+  if(!STATE.occ.length){v.innerHTML='<div class="empty">Nenhuma ocorrência registrada.<br>Use o botão acima ou registre a partir de um componente reprovado.</div>';return;}
+  v.innerHTML='';
+  STATE.occ.slice().reverse().forEach(o=>{
+    const c=COMPONENTES.find(x=>x.key===o.comp);
+    const el=document.createElement('div');el.className='occ';
+    el.innerHTML=`<div class="top"><span class="comp-n">${c?c.nome:'Geral'}</span>
+      <span class="time">${o.data}</span></div><div class="desc">${o.desc.replace(/</g,'&lt;')}</div>
+      <div style="text-align:right;margin-top:6px"><button class="del">remover</button></div>`;
+    el.querySelector('.del').onclick=()=>{STATE.occ=STATE.occ.filter(x=>x.id!==o.id);save();renderOcc();renderComp();};
+    v.appendChild(el);
+  });
+}
+function occForm(prefKey){
+  const opts=COMPONENTES.map(c=>`<option value="${c.key}" ${c.key===prefKey?'selected':''}>${c.nome}</option>`).join('');
+  $('#modal-title').textContent='Registrar ocorrência';
+  $('#modal-body').innerHTML=`<div style="padding:14px">
+      <div class="field"><label>Componente</label><select id="o-comp">${opts}</select></div>
+      <div class="field"><label>Descrição do problema</label><textarea id="o-desc" placeholder="Descreva o problema encontrado…"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn ghost" style="flex:1" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" style="flex:1" id="o-save">Salvar ocorrência</button></div>`;
+  openModal();
+  $('#o-save').onclick=()=>{
+    const desc=$('#o-desc').value.trim(); if(!desc){toast('Descreva o problema.');return;}
+    STATE.occ.push({id:Date.now(), comp:$('#o-comp').value, desc, data:agora()});
+    save(); closeModal(); renderComp();
+    if($('#view-occ').style.display!=='none') renderOcc();
+    toast('Ocorrência registrada.');
+  };
+}
+
+/* ---- resumo ---- */
+function contagem(){
+  let ok=0,fail=0,pend=0;
+  COMPONENTES.forEach(c=>{const s=STATE.comp[c.key];if(s==='aprovado')ok++;else if(s==='reprovado')fail++;else pend++;});
+  return {ok,fail,pend,total:COMPONENTES.length};
+}
+function veredito(){const {fail,pend}=contagem();
+  if(fail>0)return{cls:'nao',txt:'NÃO APTA'}; if(pend>0)return{cls:'inc',txt:'INSPEÇÃO INCOMPLETA'}; return{cls:'apta',txt:'APTA PARA OPERAÇÃO'};}
+function renderResumo(){
+  const {ok,fail,pend,total}=contagem(); const done=ok+fail; const v=veredito();
+  const el=$('#verdict'); el.className='verdict '+v.cls; el.querySelector('.v').textContent=v.txt;
+  $('#prog').style.width=(done/total*100)+'%';
+  $('#prog-txt').textContent=`${done} de ${total} componentes inspecionados`;
+  $('#st-ok').textContent=ok;$('#st-fail').textContent=fail;$('#st-pend').textContent=pend;
+}
+function relatorio(){
+  const {ok,fail,pend,total}=contagem(); const v=veredito(); const done=ok+fail;
+  let r='RELATÓRIO DE INSPEÇÃO DE EMPILHADEIRA\n';
+  r+='Fábrica de Empilhadeiras Automáticas — Grupo 01\n';
+  r+='========================================\n';
+  r+=`Equipamento: ${STATE.equip.id||'(não informado)'}\n`;
+  r+=`Operador:    ${STATE.equip.op||'(não informado)'}\n`;
+  r+=`Data/hora:   ${agora()}\n`;
+  r+=`Resultado:   ${v.txt}\n`;
+  r+=`Progresso:   ${done}/${total} inspecionados  (${ok} aprovados, ${fail} reprovados, ${pend} pendentes)\n`;
+  r+='\n--- COMPONENTES ---\n';
+  COMPONENTES.forEach((c,i)=>{r+=`${String(i+1).padStart(2,'0')}. ${c.nome.padEnd(32,' ')} ${statusLabel(STATE.comp[c.key]).toUpperCase()}\n`;});
+  r+='\n--- OCORRÊNCIAS ('+STATE.occ.length+') ---\n';
+  if(!STATE.occ.length) r+='Nenhuma ocorrência registrada.\n';
+  else STATE.occ.forEach((o,i)=>{const c=COMPONENTES.find(x=>x.key===o.comp);r+=`${i+1}. [${c?c.nome:'Geral'}] ${o.desc}  (${o.data})\n`;});
+  return r;
+}
+function showReport(){
+  const txt=relatorio();
+  $('#modal-title').textContent='Relatório de inspeção';
+  $('#modal-body').innerHTML=`<pre id="rep">${txt.replace(/</g,'&lt;')}</pre>
+    <div class="mf"><button class="btn ghost" style="flex:1" onclick="closeModal()">Fechar</button>
+      <button class="btn primary" style="flex:1" id="rep-copy">Copiar relatório</button></div>`;
+  openModal();
+  $('#rep-copy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('Relatório copiado.');}catch(e){toast('Selecione e copie o texto.');}};
+}
+
+/* ---- modal / painel ---- */
+function openModal(){$('#modal').classList.add('open');}
+function closeModal(){$('#modal').classList.remove('open');}
+function openPanel(){$('#panel').classList.add('open');}
+function closePanel(){$('#panel').classList.remove('open');}
+function agora(){const d=new Date();const p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+
+/* ============================ RA (3D) ============================ */
+function buildForklift(){
+  const rig=$('#rig'); if(!rig) return;
+  // escala/posição geral sobre o marcador
+  rig.setAttribute('position','0 0 0'); rig.setAttribute('scale','0.6 0.6 0.6');
+  const steel='#8b97a6', dark='#3b434f', accent='#f59e0b';
+  const parts=`
+    <a-box position="0 0.45 0.2" width="1.2" height="0.7" depth="1.5" color="${steel}"></a-box>
+    <a-box position="0 0.95 0.75" width="1.1" height="0.35" depth="0.5" color="${dark}"></a-box>
+    <a-box position="0 0.2 1.0" width="1.15" height="0.5" depth="0.35" color="#5b6552"></a-box>
+    <a-box position="0 1.15 -0.9" width="1.0" height="2.2" depth="0.12" color="${dark}"></a-box>
+    <a-box position="-0.32 0.1 -1.25" width="0.16" height="0.07" depth="0.75" color="${accent}"></a-box>
+    <a-box position="0.32 0.1 -1.25" width="0.16" height="0.07" depth="0.75" color="${accent}"></a-box>
+    <a-cylinder position="-0.62 0.22 -0.7" radius="0.22" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="0.62 0.22 -0.7" radius="0.22" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="-0.6 0.2 0.7" radius="0.2" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="0.6 0.2 0.7" radius="0.2" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-box position="-0.5 1.55 0.75" width="0.06" height="1.0" depth="0.06" color="${dark}"></a-box>
+    <a-box position="0.5 1.55 0.75" width="0.06" height="1.0" depth="0.06" color="${dark}"></a-box>
+    <a-box position="0 2.05 0.75" width="1.1" height="0.06" depth="0.6" color="${dark}"></a-box>`;
+  // hotspots
+  let hs='';
+  COMPONENTES.forEach((c,i)=>{
+    const [x,y,z]=c.pos;
+    hs+=`<a-sphere id="hs-${c.key}" class="hotspot" data-key="${c.key}" position="${x} ${y} ${z}" radius="0.14"
+           material="shader:flat; color:${COR[STATE.comp[c.key]]}"></a-sphere>
+         <a-text value="${i+1}" position="${x} ${y+0.28} ${z}" align="center" width="4" color="#fff"></a-text>`;
+  });
+  rig.innerHTML=parts+hs;
+}
+function updateHotspots(){
+  COMPONENTES.forEach(c=>{
+    const s=document.querySelector('#hs-'+c.key);
+    if(s) s.setAttribute('material','shader:flat; color:'+COR[STATE.comp[c.key]]);
   });
 }
 
-/* ---------- preenche o HUD (DOM) ---------- */
-function mostrarHUD(id){
-  const f = id ? window.FERRAMENTAS[id] : null;
-  const hud = document.getElementById("hud");
-  if(!f){ hud.classList.add("hidden"); return; }
-  const s = window.calcularStatus(f);
-  document.getElementById("h-dot").style.color = s.cor;
-  document.getElementById("h-dot").style.background = s.cor;
-  document.getElementById("h-cod").textContent = f.codigo + " · " + f.categoria;
-  document.getElementById("h-nome").textContent = f.nome;
-  const st = document.getElementById("h-status");
-  st.textContent = s.rotulo; st.style.background = s.cor;
-  st.style.color = s.nivel==="ATENCAO" ? "#1b1300" : "#fff";
-
-  const pct = Math.max(6, Math.min(100, Math.round(f.estoqueAtual / Math.max(f.estoqueMinimo,1) * 50)));
-  let grid =
-    `<span>Setor</span><span>${f.setor}${f.equipamento&&f.equipamento!=="—"?" · "+f.equipamento:""}</span>`+
-    `<span>Local</span><span>${f.local}</span>`+
-    `<span>Estoque</span><span>${f.estoqueAtual}/${f.estoqueMinimo} ${f.unidade}`+
-      `<div class="bar"><i style="width:${pct}%;background:${s.cor}"></i></div></span>`;
-  if(f.calibracao)
-    grid += `<span>Calibração</span><span style="color:${f.calibracao.situacao==='Vencida'?s.cor:'inherit'}">`+
-            `${f.calibracao.situacao} (val. ${fmtData(f.calibracao.validade)})</span>`;
-  if(f.compra && f.compra.situacao && f.compra.situacao!=="—")
-    grid += `<span>Compra</span><span>${f.compra.situacao}${f.compra.documento?" · "+f.compra.documento:""}</span>`;
-  document.getElementById("h-grid").innerHTML = grid;
-
-  let hist = `<h4>Histórico de movimentações</h4>`;
-  f.historico.slice(0,3).forEach(h=>{
-    hist += `<div class="row"><b>${fmtData(h.data)}</b> ${h.tipo}`+
-            `${h.qtd?` — ${h.qtd} ${f.unidade}`:""} <span style="margin-left:auto;color:var(--muted)">${h.resp}</span></div>`;
-  });
-  document.getElementById("h-hist").innerHTML = hist;
-  hud.classList.remove("hidden");
+/* ============================ CÂMERA STATUS ============================ */
+function setCam(state){ // 'ok' | 'off' | 'wait'
+  const el=$('#camstate'); el.className=state==='ok'?'ok':state==='off'?'off':'';
+  el.querySelector('.t').textContent = state==='ok'?'câmera ativa':state==='off'?'sem câmera':'iniciando câmera…';
 }
+let camTries=0;
+const camCheck=setInterval(()=>{
+  const v=document.querySelector('video');
+  if(v && v.videoWidth>0){ setCam('ok'); $('#aviso').style.display='none'; clearInterval(camCheck); return; }
+  if(++camTries>=4){ setCam('off'); $('#aviso').style.display='flex'; clearInterval(camCheck); }
+},2000);
 
-/* ---------- eventos dos marcadores ---------- */
-let visivel = null, modoDemo = false;
-function ligarEventos(){
-  document.querySelectorAll("a-marker").forEach(mk=>{
-    mk.addEventListener("markerFound", ()=>{ if(modoDemo) return; visivel = mk.dataset.tool; mostrarHUD(visivel); });
-    mk.addEventListener("markerLost",  ()=>{ if(modoDemo) return; if(visivel===mk.dataset.tool){ visivel=null; mostrarHUD(null); } });
-  });
-}
+/* ============================ INICIALIZAÇÃO ============================ */
+window.addEventListener('DOMContentLoaded',()=>{
+  // restaura equipamento
+  $('#eq-id').value=STATE.equip.id||''; $('#eq-op').value=STATE.equip.op||'';
+  $('#eq-id').oninput=e=>{STATE.equip.id=e.target.value;save();};
+  $('#eq-op').oninput=e=>{STATE.equip.op=e.target.value;save();};
 
-/* ---------- modo demonstração (sem câmera/marcador) ---------- */
-function demo(id){ modoDemo = !!id; if(id){ document.getElementById("aviso").style.display="none"; } mostrarHUD(id); }
-function criarBotoesDemo(){
-  const box = document.getElementById("demo-btns");
-  Object.keys(window.FERRAMENTAS).forEach(id=>{
-    const b = document.createElement("button");
-    b.textContent = window.FERRAMENTAS[id].codigo;
-    b.onclick = ()=>demo(id);
-    box.appendChild(b);
-  });
-}
+  renderComp(); renderResumo();
 
-/* ---------- inicialização ---------- */
-window.addEventListener("DOMContentLoaded", ()=>{
-  montarConteudoAR();
-  criarBotoesDemo();
-  const scene = document.getElementById("scene");
-  scene.addEventListener("loaded", ligarEventos);
-  // aviso se a câmera falhar
-  window.addEventListener("camera-error", ()=>document.getElementById("aviso").style.display="flex");
-  window.addEventListener("camera-init",  ()=>document.getElementById("aviso").style.display="none");
-  // verifica se a câmera realmente está transmitindo (vídeo com dimensão), não só se o elemento existe
-  let tentativas = 0;
-  const checarCamera = setInterval(()=>{
-    const v = document.querySelector("video");
-    if (v && v.videoWidth > 0){ document.getElementById("aviso").style.display="none"; clearInterval(checarCamera); return; }
-    if (++tentativas >= 4){ document.getElementById("aviso").style.display="flex"; clearInterval(checarCamera); }
-  }, 2000);
+  // tabs
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+  // detalhe
+  $('#d-back').onclick=closeDetail;
+  $('#d-ok').onclick=()=>setStatus(currentKey, STATE.comp[currentKey]==='aprovado'?'pendente':'aprovado');
+  $('#d-fail').onclick=()=>setStatus(currentKey, STATE.comp[currentKey]==='reprovado'?'pendente':'reprovado');
+  $('#d-occ').onclick=()=>occForm(currentKey);
+  // ocorrências
+  $('#occ-new').onclick=()=>occForm(COMPONENTES[0].key);
+  // resumo
+  $('#res-report').onclick=showReport;
+  $('#res-reset').onclick=()=>{ if(confirm('Iniciar uma nova inspeção? Os dados atuais serão apagados.')){
+    STATE=novoEstado(); save(); $('#eq-id').value='';$('#eq-op').value='';
+    renderComp(); renderResumo(); updateHotspots(); closeDetail(); setTab('comp'); toast('Nova inspeção iniciada.'); } };
+
+  // grip fecha painel no mobile
+  $('#panel .grip').onclick=closePanel;
+
+  // AR
+  const scene=$('#scene');
+  const start=()=>{ buildForklift();
+    const mk=$('#marker');
+    mk.addEventListener('markerFound',()=>toast('Empilhadeira reconhecida'));
+  };
+  if(scene.hasLoaded) start(); else scene.addEventListener('loaded',start);
 });
 </script>
 </body>
