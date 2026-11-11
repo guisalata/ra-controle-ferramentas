@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>RA • Controle de Ferramentas de Usinagem — Grupo 01</title>
+
+<!-- Bibliotecas WebAR (carregadas pelo navegador do usuário) -->
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+<!-- Base de dados das ferramentas (recorte do sistema Electron) -->
+<script src="dados_ferramentas.js"></script>
+
+<style>
+  :root{ --bg:#0d1117; --panel:#161b22; --line:#2a313c; --txt:#e6edf3; --muted:#9aa7b4;
+         --ok:#30a46c; --warn:#f5a623; --crit:#e5484d; --accent:#2f81f7; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; font-family:"Segoe UI",Roboto,Arial,sans-serif; color:var(--txt); background:#000; overflow:hidden; }
+
+  /* Faixa de título */
+  #topbar{ position:fixed; top:0; left:0; right:0; z-index:30; display:flex; align-items:center; gap:10px;
+           padding:8px 14px; background:linear-gradient(180deg,rgba(13,17,23,.92),rgba(13,17,23,.55));
+           backdrop-filter:blur(3px); font-size:13px; letter-spacing:.3px; }
+  #topbar b{ font-size:14px; }
+  #topbar .tag{ margin-left:auto; color:var(--muted); font-size:11px; border:1px solid var(--line);
+                padding:3px 8px; border-radius:20px; }
+
+  /* Painel HUD de dados */
+  #hud{ position:fixed; z-index:30; left:12px; bottom:12px; width:min(360px,calc(100% - 24px));
+        background:rgba(22,27,34,.93); border:1px solid var(--line); border-radius:14px; padding:14px 16px;
+        box-shadow:0 8px 30px rgba(0,0,0,.45); transition:transform .25s ease, opacity .25s ease; }
+  #hud.hidden{ transform:translateY(16px); opacity:0; pointer-events:none; }
+  #hud .head{ display:flex; align-items:center; gap:10px; }
+  #hud .dot{ width:14px; height:14px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 10px currentColor; }
+  #hud .cod{ font-size:12px; color:var(--muted); letter-spacing:.5px; }
+  #hud .nome{ font-size:17px; font-weight:700; line-height:1.2; }
+  #hud .status{ margin-left:auto; font-size:11px; font-weight:700; padding:4px 9px; border-radius:20px; white-space:nowrap; }
+  #hud .grid{ margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:4px 10px; font-size:12.5px; }
+  #hud .grid span:nth-child(odd){ color:var(--muted); }
+  #hud .bar{ height:8px; border-radius:6px; background:#0b0f14; border:1px solid var(--line); overflow:hidden; margin-top:3px; }
+  #hud .bar > i{ display:block; height:100%; }
+  #hud .hist{ margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
+  #hud .hist h4{ margin:0 0 5px; font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.4px; text-transform:uppercase; }
+  #hud .hist .row{ display:flex; gap:8px; font-size:12px; padding:2px 0; }
+  #hud .hist .row b{ width:72px; color:var(--muted); font-weight:500; }
+  #hud .empty{ color:var(--muted); font-size:13px; padding:4px 0; }
+
+  /* Legenda + controles */
+  #side{ position:fixed; z-index:30; right:12px; bottom:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+  .legend{ background:rgba(22,27,34,.9); border:1px solid var(--line); border-radius:12px; padding:8px 10px; font-size:11.5px; }
+  .legend div{ display:flex; align-items:center; gap:7px; padding:1px 0; }
+  .legend i{ width:10px; height:10px; border-radius:50%; }
+  .demo{ background:rgba(22,27,34,.9); border:1px solid var(--line); border-radius:12px; padding:8px 10px; }
+  .demo p{ margin:0 0 6px; font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .demo button{ font:inherit; font-size:12px; color:var(--txt); background:#1f2630; border:1px solid var(--line);
+                border-radius:8px; padding:5px 9px; margin:2px; cursor:pointer; }
+  .demo button:hover{ border-color:var(--accent); }
+  .demo button.off{ background:transparent; color:var(--muted); }
+
+  /* Aviso de câmera */
+  #aviso{ position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:24px;
+          background:rgba(5,8,12,.92); text-align:center; }
+  #aviso .box{ max-width:440px; position:relative; }
+  #aviso .fechar{ position:absolute; top:-10px; right:-6px; background:#1f2630; color:#e6edf3; border:1px solid var(--line);
+                  border-radius:50%; width:30px; height:30px; font-size:16px; cursor:pointer; }
+  #aviso h2{ margin:0 0 8px; }
+  #aviso p{ color:var(--muted); line-height:1.5; font-size:14px; }
+  a-scene{ position:fixed; inset:0; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <b>RA · Controle de Ferramentas</b>
+  <span style="color:var(--muted)">Setor de Usinagem — Fábrica de Empilhadeiras Automáticas</span>
+  <span class="tag">Grupo 01 · WebAR (AR.js)</span>
+</div>
+
+<!-- Painel de dados (preenchido via JS) -->
+<div id="hud" class="hidden">
+  <div class="head">
+    <span class="dot" id="h-dot"></span>
+    <div>
+      <div class="cod" id="h-cod">—</div>
+      <div class="nome" id="h-nome">—</div>
+    </div>
+    <span class="status" id="h-status"></span>
+  </div>
+  <div class="grid" id="h-grid"></div>
+  <div class="hist" id="h-hist"></div>
+</div>
+
+<div id="side">
+  <div class="legend">
+    <div><i style="background:#30a46c"></i> OK</div>
+    <div><i style="background:#f5a623"></i> Atenção (baixo / calibração)</div>
+    <div><i style="background:#e5484d"></i> Crítico (repor)</div>
+  </div>
+  <div class="demo">
+    <p>Modo demonstração (sem marcador)</p>
+    <div id="demo-btns"></div>
+    <button class="off" onclick="demo(null)">limpar</button>
+  </div>
+</div>
+
+<div id="aviso"><div class="box">
+  <button class="fechar" onclick="document.getElementById('aviso').style.display='none'" title="Fechar">×</button>
+  <h2>Câmera não disponível</h2>
+  <p>Para a Realidade Aumentada é preciso permitir a câmera e abrir a página por
+  <b>HTTPS</b> (no celular) ou <b>http://localhost</b> (no PC). Enquanto isso, use o
+  <b>Modo demonstração</b> no canto inferior direito.</p>
+</div></div>
+
+<!-- ===================== CENA WEBAR ===================== -->
+<a-scene embedded vr-mode-ui="enabled:false" renderer="logarithmicDepthBuffer:true; precision:medium"
+         arjs="sourceType:webcam; detectionMode:mono; patternRatio:0.5; debugUIEnabled:false;"
+         id="scene">
+
+  <!-- MK1 -->
+  <a-marker id="ar-mk1" type="pattern" url="mk1.patt" smooth="true" smoothCount="6" data-tool="mk1">
+    <a-entity class="ar-content"></a-entity>
+  </a-marker>
+  <!-- MK2 -->
+  <a-marker id="ar-mk2" type="pattern" url="mk2.patt" smooth="true" smoothCount="6" data-tool="mk2">
+    <a-entity class="ar-content"></a-entity>
+  </a-marker>
+  <!-- MK3 -->
+  <a-marker id="ar-mk3" type="pattern" url="mk3.patt" smooth="true" smoothCount="6" data-tool="mk3">
+    <a-entity class="ar-content"></a-entity>
+  </a-marker>
+
+  <a-entity camera></a-entity>
+</a-scene>
+
+<script>
+/* ---------- utilidades ---------- */
+function fmtData(d){ if(!d) return "—"; const [a,m,g]=d.split("-"); return `${g}/${m}/${a}`; }
+
+/* ---------- monta o conteúdo 3D (RA) de cada marcador ---------- */
+function montarConteudoAR(){
+  document.querySelectorAll("a-marker").forEach(mk=>{
+    const f = window.FERRAMENTAS[mk.dataset.tool]; if(!f) return;
+    const s = window.calcularStatus(f);
+    const wrap = mk.querySelector(".ar-content");
+
+    // painel de dados deitado sobre o marcador (lido de cima)
+    const texto =
+      `${f.codigo}\n${f.nome}\n\n`+
+      `Estoque: ${f.estoqueAtual}/${f.estoqueMinimo} ${f.unidade}\n`+
+      `Local: ${f.local}\n`+
+      `${s.rotulo}`;
+
+    wrap.innerHTML =
+      `<a-entity rotation="-90 0 0" position="0 0.02 -1.15">
+         <a-plane width="3.1" height="2.2" material="shader:flat; color:#0d1117; opacity:0.92"></a-plane>
+         <a-plane width="3.1" height="0.12" position="0 1.04 0.001" material="shader:flat; color:${s.cor}"></a-plane>
+         <a-text value="${texto}" align="center" width="2.9" color="#e6edf3"
+                 position="0 0 0.01" baseline="center" wrap-count="26"></a-text>
+       </a-entity>
+       <!-- cubo de status flutuante -->
+       <a-box position="0 0.55 0" depth="0.45" height="0.45" width="0.45"
+              material="shader:flat; color:${s.cor}; opacity:0.92"
+              animation="property:position; to:0 0.8 0; dir:alternate; loop:true; dur:1200; easing:easeInOutSine">
+       </a-box>
+       <a-text value="${f.codigo}" align="center" width="4" color="#ffffff"
+               position="0 1.25 0" rotation="-20 0 0"></a-text>`;
+  });
+}
+
+/* ---------- preenche o HUD (DOM) ---------- */
+function mostrarHUD(id){
+  const f = id ? window.FERRAMENTAS[id] : null;
+  const hud = document.getElementById("hud");
+  if(!f){ hud.classList.add("hidden"); return; }
+  const s = window.calcularStatus(f);
+  document.getElementById("h-dot").style.color = s.cor;
+  document.getElementById("h-dot").style.background = s.cor;
+  document.getElementById("h-cod").textContent = f.codigo + " · " + f.categoria;
+  document.getElementById("h-nome").textContent = f.nome;
+  const st = document.getElementById("h-status");
+  st.textContent = s.rotulo; st.style.background = s.cor;
+  st.style.color = s.nivel==="ATENCAO" ? "#1b1300" : "#fff";
+
+  const pct = Math.max(6, Math.min(100, Math.round(f.estoqueAtual / Math.max(f.estoqueMinimo,1) * 50)));
+  let grid =
+    `<span>Setor</span><span>${f.setor}${f.equipamento&&f.equipamento!=="—"?" · "+f.equipamento:""}</span>`+
+    `<span>Local</span><span>${f.local}</span>`+
+    `<span>Estoque</span><span>${f.estoqueAtual}/${f.estoqueMinimo} ${f.unidade}`+
+      `<div class="bar"><i style="width:${pct}%;background:${s.cor}"></i></div></span>`;
+  if(f.calibracao)
+    grid += `<span>Calibração</span><span style="color:${f.calibracao.situacao==='Vencida'?s.cor:'inherit'}">`+
+            `${f.calibracao.situacao} (val. ${fmtData(f.calibracao.validade)})</span>`;
+  if(f.compra && f.compra.situacao && f.compra.situacao!=="—")
+    grid += `<span>Compra</span><span>${f.compra.situacao}${f.compra.documento?" · "+f.compra.documento:""}</span>`;
+  document.getElementById("h-grid").innerHTML = grid;
+
+  let hist = `<h4>Histórico de movimentações</h4>`;
+  f.historico.slice(0,3).forEach(h=>{
+    hist += `<div class="row"><b>${fmtData(h.data)}</b> ${h.tipo}`+
+            `${h.qtd?` — ${h.qtd} ${f.unidade}`:""} <span style="margin-left:auto;color:var(--muted)">${h.resp}</span></div>`;
+  });
+  document.getElementById("h-hist").innerHTML = hist;
+  hud.classList.remove("hidden");
+}
+
+/* ---------- eventos dos marcadores ---------- */
+let visivel = null, modoDemo = false;
+function ligarEventos(){
+  document.querySelectorAll("a-marker").forEach(mk=>{
+    mk.addEventListener("markerFound", ()=>{ if(modoDemo) return; visivel = mk.dataset.tool; mostrarHUD(visivel); });
+    mk.addEventListener("markerLost",  ()=>{ if(modoDemo) return; if(visivel===mk.dataset.tool){ visivel=null; mostrarHUD(null); } });
+  });
+}
+
+/* ---------- modo demonstração (sem câmera/marcador) ---------- */
+function demo(id){ modoDemo = !!id; if(id){ document.getElementById("aviso").style.display="none"; } mostrarHUD(id); }
+function criarBotoesDemo(){
+  const box = document.getElementById("demo-btns");
+  Object.keys(window.FERRAMENTAS).forEach(id=>{
+    const b = document.createElement("button");
+    b.textContent = window.FERRAMENTAS[id].codigo;
+    b.onclick = ()=>demo(id);
+    box.appendChild(b);
+  });
+}
+
+/* ---------- inicialização ---------- */
+window.addEventListener("DOMContentLoaded", ()=>{
+  montarConteudoAR();
+  criarBotoesDemo();
+  const scene = document.getElementById("scene");
+  scene.addEventListener("loaded", ligarEventos);
+  // aviso se a câmera falhar
+  window.addEventListener("camera-error", ()=>document.getElementById("aviso").style.display="flex");
+  window.addEventListener("camera-init",  ()=>document.getElementById("aviso").style.display="none");
+  setTimeout(()=>{ if(!document.querySelector("video")) document.getElementById("aviso").style.display="flex"; }, 4000);
+});
+</script>
+</body>
+</html>
