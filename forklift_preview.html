@@ -1,0 +1,35 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#0c0f15}</style></head>
+<body>
+<a-scene background="color: #0c0f15" renderer="antialias:true" vr-mode-ui="enabled:false">
+  <a-entity light="type:ambient; intensity:0.75"></a-entity>
+  <a-entity light="type:directional; intensity:0.9; color:#ffffff" position="3 5 4"></a-entity>
+  <a-entity light="type:directional; intensity:0.35; color:#cfe0ff" position="-4 2 -3"></a-entity>
+  <a-entity id="forklift" position="0 -0.2 0" rotation="0 36 0" scale="1.25 1.25 1.25">
+    <a-box position="0 0.45 0.2" width="1.2" height="0.7" depth="1.5" color="#8b97a6"></a-box>
+    <a-box position="0 0.95 0.75" width="1.1" height="0.35" depth="0.5" color="#3b434f"></a-box>
+    <a-box position="0 0.2 1.0" width="1.15" height="0.5" depth="0.35" color="#5b6552"></a-box>
+    <a-box position="0 1.15 -0.9" width="1.0" height="2.2" depth="0.12" color="#3b434f"></a-box>
+    <a-box position="-0.32 0.1 -1.25" width="0.16" height="0.07" depth="0.75" color="#f59e0b"></a-box>
+    <a-box position="0.32 0.1 -1.25" width="0.16" height="0.07" depth="0.75" color="#f59e0b"></a-box>
+    <a-cylinder position="-0.62 0.22 -0.7" radius="0.22" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="0.62 0.22 -0.7" radius="0.22" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="-0.6 0.2 0.7" radius="0.2" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-cylinder position="0.6 0.2 0.7" radius="0.2" height="0.18" rotation="0 0 90" color="#20242b"></a-cylinder>
+    <a-box position="-0.5 1.55 0.75" width="0.06" height="1.0" depth="0.06" color="#3b434f"></a-box>
+    <a-box position="0.5 1.55 0.75" width="0.06" height="1.0" depth="0.06" color="#3b434f"></a-box>
+    <a-box position="0 2.05 0.75" width="1.1" height="0.06" depth="0.6" color="#3b434f"></a-box>
+    <!-- hotspots -->
+    <a-sphere position="0.70 0.65 0.35" radius="0.14" material="shader:flat; color:#22c55e"></a-sphere><a-text value="1" position="0.70 0.95 0.35" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0.58 0.24 -0.72" radius="0.14" material="shader:flat; color:#22c55e"></a-sphere><a-text value="2" position="0.58 0.52 -0.72" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0 0.12 -1.30" radius="0.14" material="shader:flat; color:#f59e0b"></a-sphere><a-text value="3" position="0 0.40 -1.30" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0 1.95 -0.90" radius="0.14" material="shader:flat; color:#22c55e"></a-sphere><a-text value="4" position="0 2.23 -0.90" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0 0.55 -0.78" radius="0.14" material="shader:flat; color:#ef4444"></a-sphere><a-text value="5" position="0 0.83 -0.78" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0 0.55 0.95" radius="0.14" material="shader:flat; color:#f59e0b"></a-sphere><a-text value="6" position="0 0.83 0.95" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="0 1.05 -1.05" radius="0.14" material="shader:flat; color:#f59e0b"></a-sphere><a-text value="7" position="0 1.33 -1.05" align="center" width="4" color="#fff"></a-text>
+    <a-sphere position="-0.58 0.24 0.72" radius="0.14" material="shader:flat; color:#f59e0b"></a-sphere><a-text value="8" position="-0.58 0.52 0.72" align="center" width="4" color="#fff"></a-text>
+  </a-entity>
+  <a-entity camera position="0 1.5 4.6" rotation="-8 0 0"></a-entity>
+</a-scene>
+</body></html>
